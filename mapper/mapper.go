@@ -2,9 +2,10 @@ package mapper
 
 import (
 	"fmt"
-	"github.com/martinxsliu/protoc-gen-graphql/parameters"
 	"os"
 	"strings"
+
+	"github.com/martinxsliu/protoc-gen-graphql/parameters"
 
 	"google.golang.org/protobuf/types/descriptorpb"
 
@@ -287,16 +288,27 @@ func (m *Mapper) graphqlFields(message *descriptor.Message, input bool) []*graph
 		}
 
 		if field.IsOneof {
-			oneofObjectName := field.Name + "Oneof"
+			oneOfIdx := field.OneofIndex
+			oneOf := message.Oneofs[oneOfIdx]
+			var typeNameToUse string
+
+			// only do this if there's one oneof ie optional fields map to oneofs with 1 field
+			if len(oneOf.Fields) == 1 {
+				gqlField := m.graphqlField(oneOf.Fields[0], input)
+				typeNameToUse = gqlField.TypeName
+			} else {
+				typeNameToUse = m.buildGraphqlTypeName(&GraphqlTypeNameParts{
+					Namespace: message.File.Options.GetNamespace(),
+					Package:   message.Package,
+					TypeName:  append(message.TypeName, field.Name+"Oneof"),
+					Input:     input,
+				})
+			}
+
 			fields = append(fields, &graphql.Field{
 				Name:        m.fieldName(field),
 				Description: field.Comments,
-				TypeName: m.buildGraphqlTypeName(&GraphqlTypeNameParts{
-					Namespace: message.File.Options.GetNamespace(),
-					Package:   message.Package,
-					TypeName:  append(message.TypeName, oneofObjectName),
-					Input:     input,
-				}),
+				TypeName:    typeNameToUse,
 			})
 			continue
 		}
